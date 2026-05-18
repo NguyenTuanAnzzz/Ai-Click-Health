@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BeFast AI - Chẩn Đoán Đột Quỵ</title>
+  <style>
+    :root {
+      --bg: #10131a;
+      --panel: #171c25;
+      --panel-border: #2f3949;
+      --accent: #12b3ff;
+      --accent-strong: #ff6b2c;
+      --text: #eef4ff;
+      --muted: #98a5bb;
+      --ok: #2fd38b;
+      --warn: #ffcd57;
+      --danger: #ff4d4d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(18, 179, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(255, 107, 44, 0.16), transparent 24%),
+        linear-gradient(180deg, #0d1016 0%, #111722 100%);
+      color: var(--text);
+    }
+
+    .page {
+      width: min(1400px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.05;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 720px;
+    }
+
+    .badge {
+      border: 1px solid rgba(18, 179, 255, 0.3);
+      background: rgba(18, 179, 255, 0.12);
+      color: #9be3ff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2.5fr) minmax(320px, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      background: rgba(23, 28, 37, 0.84);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 600px;
+      background: #000;
+      border-bottom: 2px solid var(--panel-border);
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--accent);
+      box-shadow: 0 0 15px var(--accent), 0 0 30px var(--accent);
+      z-index: 10;
+      display: none;
+      pointer-events: none;
+    }
+
+    @keyframes scanMove {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    .scanning .scan-line {
+      display: block;
+      animation: scanMove 1.5s linear infinite;
+    }
+
+    .recording-pulse {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background-color: var(--danger);
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 1s infinite;
+      vertical-align: middle;
+      display: none;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.5; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hud {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      display: grid;
+      gap: 10px;
+      z-index: 3;
+    }
+
+    .hud-chip {
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(9, 13, 20, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      font-size: 14px;
+    }
+
+    .hud-chip strong { color: var(--ok); }
+
+    .controls, .side { padding: 18px; }
+
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, var(--accent), #3b82f6);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    button.secondary { background: linear-gradient(135deg, var(--accent-strong), #ff8f57); }
+    button.danger { background: linear-gradient(135deg, var(--danger), #b30000); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 10px;
+      display: block;
+    }
+
+    .side h2, .controls h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 8px;
+    }
+
+    .card {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      margin-top: 6px;
+      color: var(--muted);
+    }
+
+    .value { color: var(--text); font-weight: 700; }
+    .val-danger { color: var(--danger); }
+    .val-ok { color: var(--ok); }
+
+    .guide {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h1 class="title">BeFast AI - Hệ Thống Chẩn Đoán</h1>
+        <p class="subtitle">Sử dụng trí tuệ nhân tạo để phát hiện sớm các dấu hiệu đột quỵ.</p>
+      </div>
+      <div class="badge">B.E.F.A.S.T. Full</div>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="stage" id="video-container">
+          <video id="camera" autoplay playsinline muted></video>
+          <div class="scan-line"></div>
+          <div class="hud">
+            <div class="hud-chip">Trạng thái: <strong id="camera-state">Đang chờ</strong></div>
+            <div class="hud-chip">Chế độ: <strong id="mode-state">Sẵn sàng</strong></div>
+          </div>
+        </div>
+        <div class="controls">
+          <h2>Điều khiển kiểm tra</h2>
+          <div class="control-row">
+            <button id="start-btn">Bật Camera</button>
+            <button id="stop-btn" class="danger" disabled>Dừng Camera</button>
+          </div>
+          <div class="control-row">
+            <button id="scan-face-btn" class="secondary" disabled>Mặt (Face)</button>
+            <button id="scan-arm-btn" class="secondary" disabled>Tay (Arm)</button>
+            <button id="scan-balance-btn" class="secondary" disabled>Thăng bằng (Balance)</button>
+            <button id="scan-speech-btn" class="secondary" disabled>Ghi âm giọng nói</button>
+          </div>
+          <span id="status" class="status">
+            <span id="mic-pulse" class="recording-pulse"></span>
+            <span id="status-msg">Nhấn Bật Camera để bắt đầu quá trình kiểm tra.</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="panel side">
+        <h2>Kết quả theo dõi</h2>
+        
+        <div class="card" id="face-card">
+          <div class="card-title">Mặt (Face Droop) <span id="face-indicator">-</span></div>
+          <div class="metric"><span>Trạng thái</span><span id="face-status" class="value">Chưa quét</span></div>
+          <div class="metric"><span>Điểm méo mặt</span><span id="face-score" class="value">-</span></div>
+        </div>
+
+        <div class="card" id="arm-card">
+          <div class="card-title">Tay (Arm Weakness) <span id="arm-indicator">-</span></div>
+          <div class="metric"><span>Trạng thái</span><span id="arm-status" class="value">Chưa quét</span></div>
+          <div class="metric"><span>Thông điệp</span><span id="arm-msg" class="value">-</span></div>
+        </div>
+
+        <div class="card" id="balance-card">
+          <div class="card-title">Thăng bằng (Balance) <span id="balance-indicator">-</span></div>
+          <div class="metric"><span>Trạng thái</span><span id="balance-status" class="value">Chưa quét</span></div>
+          <div class="metric"><span>Thông điệp</span><span id="balance-msg" class="value">-</span></div>
+        </div>
+
+        <div class="card" id="speech-card">
+          <div class="card-title">Giọng nói (Speech) <span id="speech-indicator">-</span></div>
+          <div class="metric"><span>Trạng thái</span><span id="speech-status" class="value">Chưa quét</span></div>
+          <div class="metric"><span>Kết quả nghe</span><span id="speech-text" class="value">-</span></div>
+          <div class="metric" style="margin-top: 10px;">
+            <button id="playback-btn" class="secondary" style="padding: 6px 10px; font-size: 12px; display: none;">▶ Nghe lại</button>
+          </div>
+          <audio id="audio-playback" style="display: none;"></audio>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Hướng dẫn</div>
+          <ol class="guide">
+            <li><strong>Mặt:</strong> Cười tươi để kiểm tra độ cân đối.</li>
+            <li><strong>Tay:</strong> Giơ cả hai tay ra trước mặt.</li>
+            <li><strong>Thăng bằng:</strong> Đứng thẳng người.</li>
+            <li><strong>Giọng nói:</strong> Đọc: <em>"Mẹ đi chợ mua cá"</em>.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Elements
+    const video = document.getElementById("camera");
+    const videoContainer = document.getElementById("video-container");
+    const startBtn = document.getElementById("start-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const scanFaceBtn = document.getElementById("scan-face-btn");
+    const scanArmBtn = document.getElementById("scan-arm-btn");
+    const scanBalanceBtn = document.getElementById("scan-balance-btn");
+    const scanSpeechBtn = document.getElementById("scan-speech-btn");
+    const statusMsg = document.getElementById("status-msg");
+    const micPulse = document.getElementById("mic-pulse");
+    const cameraState = document.getElementById("camera-state");
+    const modeState = document.getElementById("mode-state");
+
+    const faceStatus = document.getElementById("face-status");
+    const faceScore = document.getElementById("face-score");
+    const faceIndicator = document.getElementById("face-indicator");
+    const armStatus = document.getElementById("arm-status");
+    const armMsg = document.getElementById("arm-msg");
+    const armIndicator = document.getElementById("arm-indicator");
+    const balanceStatus = document.getElementById("balance-status");
+    const balanceMsg = document.getElementById("balance-msg");
+    const balanceIndicator = document.getElementById("balance-indicator");
+    const speechStatus = document.getElementById("speech-status");
+    const speechText = document.getElementById("speech-text");
+    const speechIndicator = document.getElementById("speech-indicator");
+    const playbackBtn = document.getElementById("playback-btn");
+    const audioPlayback = document.getElementById("audio-playback");
+
+    // 2. State
+    let stream = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordedAudioUrl = null;
+    let isRecording = false;
+    const captureCanvas = document.createElement("canvas");
+
+    function getApiBaseUrl() { return "http://127.0.0.1:8000"; }
+
+    // 3. Handlers
+    startBtn.onclick = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        video.srcObject = stream;
+        cameraState.textContent = "Đã kết nối";
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        [scanFaceBtn, scanArmBtn, scanBalanceBtn, scanSpeechBtn].forEach(b => b.disabled = false);
+        statusMsg.textContent = "Hệ thống sẵn sàng. Hãy chọn bài kiểm tra.";
+      } catch (err) {
+        statusMsg.textContent = "Lỗi micro/camera. Hãy cấp quyền truy cập.";
+      }
+    };
+
+    stopCamera = () => {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      video.srcObject = null;
+      cameraState.textContent = "Đã dừng";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      [scanFaceBtn, scanArmBtn, scanBalanceBtn, scanSpeechBtn].forEach(b => b.disabled = true);
+    };
+    stopBtn.onclick = stopCamera;
+
+    async function captureAndSend(endpoint, updateUI) {
+      if (!stream) return;
+      videoContainer.classList.add("scanning");
+      modeState.textContent = "Đang quét";
+      await new Promise(r => setTimeout(r, 1200));
+
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+      captureCanvas.getContext("2d").drawImage(video, 0, 0);
+      const blob = await new Promise(r => captureCanvas.toBlob(r, "image/jpeg", 0.9));
+      const formData = new FormData();
+      formData.append("file", blob, "frame.jpg");
+
+      try {
+        const res = await fetch(`${getApiBaseUrl()}${endpoint}`, { method: "POST", body: formData });
+        const data = await res.json();
+        updateUI(data);
+        modeState.textContent = "Hoàn tất";
+      } catch (err) {
+        statusMsg.textContent = "Lỗi kết nối Server.";
+      } finally {
+        videoContainer.classList.remove("scanning");
+      }
+    }
+
+    scanFaceBtn.onclick = () => captureAndSend("/predict-face", (data) => {
+      const isDroop = data.label === "face_droop";
+      faceStatus.textContent = isDroop ? "Phát hiện méo mặt" : "Bình thường";
+      faceStatus.className = isDroop ? "value val-danger" : "value val-ok";
+      faceScore.textContent = data.face_droop_score.toFixed(4);
+      faceIndicator.textContent = isDroop ? "⚠️" : "✅";
+    });
+
+    scanArmBtn.onclick = () => captureAndSend("/predict-arm", (data) => {
+      const isWeak = data.arm_weakness;
+      armStatus.textContent = isWeak ? "Yếu cơ tay" : "Bình thường";
+      armStatus.className = isWeak ? "value val-danger" : "value val-ok";
+      armMsg.textContent = data.message;
+      armIndicator.textContent = isWeak ? "⚠️" : "✅";
+    });
+
+    scanBalanceBtn.onclick = () => captureAndSend("/predict-balance", (data) => {
+      const isIssue = data.balance_issue;
+      balanceStatus.textContent = isIssue ? "Mất thăng bằng" : "Bình thường";
+      balanceStatus.className = isIssue ? "value val-danger" : "value val-ok";
+      balanceMsg.textContent = data.message;
+      balanceIndicator.textContent = isIssue ? "⚠️" : "✅";
+    });
+
+    let recognition = null;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'vi-VN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        scanSpeechBtn.textContent = "Hệ thống đang nghe...";
+        scanSpeechBtn.classList.add("danger");
+        micPulse.style.display = "inline-block";
+        statusMsg.textContent = 'Hãy đọc to: "Mẹ đi chợ mua cá"';
+        modeState.textContent = "Đang nghe";
+      };
+
+      recognition.onresult = async (event) => {
+        const resultText = event.results[0][0].transcript;
+        console.log("Browser recognized:", resultText);
+        
+        try {
+          statusMsg.textContent = "Đang xác thực...";
+          const res = await fetch(`${getApiBaseUrl()}/verify-speech`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: resultText })
+          });
+          const data = await res.json();
+          
+          const issue = data.speech_issue;
+          speechStatus.textContent = issue ? "Bất thường" : "Bình thường";
+          speechStatus.className = issue ? "value val-danger" : "value val-ok";
+          speechText.textContent = data.recognized_text;
+          speechIndicator.textContent = issue ? "⚠️" : "✅";
+          statusMsg.textContent = data.message;
+          modeState.textContent = "Hoàn tất";
+        } catch (e) {
+          statusMsg.textContent = "Lỗi xác thực giọng nói.";
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech Error:", event.error);
+        statusMsg.textContent = `Lỗi nhận diện: ${event.error}`;
+        stopRecordingUI();
+      };
+
+      recognition.onend = () => {
+        stopRecordingUI();
+      };
+    }
+
+    function stopRecordingUI() {
+      isRecording = false;
+      scanSpeechBtn.textContent = "Ghi âm giọng nói";
+      scanSpeechBtn.classList.remove("danger");
+      micPulse.style.display = "none";
+    }
+
+    scanSpeechBtn.onclick = () => {
+      if (!recognition) {
+        alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Hãy dùng Chrome hoặc Edge.");
+        return;
+      }
+      
+      if (!isRecording) {
+        recognition.start();
+      } else {
+        recognition.stop();
+      }
+    };
+
+    playbackBtn.onclick = () => audioPlayback.play();
+  </script>
+</body>
+</html>
