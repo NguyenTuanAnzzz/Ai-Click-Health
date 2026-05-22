@@ -8,6 +8,7 @@ from pathlib import Path
 from app.api.face import router as face_router
 from app.api.arm import router as arm_router
 from app.api.speech import router as speech_router
+from app.api.stroke import router as stroke_router
 
 app = FastAPI()
 BASE_DIR = Path(__file__).resolve().parent
@@ -15,8 +16,13 @@ STATIC_DIR = BASE_DIR / "static"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,3 +44,5 @@ async def camera_test():
 app.include_router(face_router)
 app.include_router(arm_router)
 app.include_router(speech_router)
+app.include_router(stroke_router)
+
