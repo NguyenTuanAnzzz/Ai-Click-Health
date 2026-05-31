@@ -420,7 +420,8 @@
       const isDroop = data.label === "face_droop";
       faceStatus.textContent = isDroop ? "Phát hiện méo mặt" : "Bình thường";
       faceStatus.className = isDroop ? "value val-danger" : "value val-ok";
-      faceScore.textContent = data.face_droop_score.toFixed(4);
+      const score = data.deviation_percentage ?? data.face_droop_score ?? 0;
+      faceScore.textContent = typeof score === 'number' ? score.toFixed(2) + '%' : '-';
       faceIndicator.textContent = isDroop ? "⚠️" : "✅";
     });
 
