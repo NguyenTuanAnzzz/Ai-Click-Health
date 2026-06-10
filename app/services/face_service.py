@@ -5,12 +5,18 @@ import mediapipe as mp
 from PIL import Image
 
 mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    static_image_mode=True,
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5
-)
+face_mesh_instance = None
+
+def get_face_mesh():
+    global face_mesh_instance
+    if face_mesh_instance is None:
+        face_mesh_instance = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5
+        )
+    return face_mesh_instance
 
 async def analyze_face_symmetry(file):
     contents = await file.read()
@@ -22,6 +28,7 @@ async def analyze_face_symmetry(file):
 
     h, w, _ = img.shape
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    face_mesh = get_face_mesh()
     results = face_mesh.process(img_rgb)
 
     if not results.multi_face_landmarks:

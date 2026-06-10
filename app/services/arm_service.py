@@ -6,7 +6,13 @@ from mediapipe.python.solutions import pose as mp_pose
 from PIL import Image
 
 # mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose_instance = None
+
+def get_pose():
+    global pose_instance
+    if pose_instance is None:
+        pose_instance = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+    return pose_instance
 
 async def predict_arm(file):
     contents = await file.read()
@@ -17,6 +23,7 @@ async def predict_arm(file):
         return {"error": "Could not decode image"}
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    pose = get_pose()
     results = pose.process(img_rgb)
 
     if not results.pose_landmarks:

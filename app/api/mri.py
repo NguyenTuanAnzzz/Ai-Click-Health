@@ -4,20 +4,33 @@ import numpy as np
 import io
 import os
 
-# Chỉ nạp tensorflow nếu file h5 tồn tại để tránh lỗi crash server
-try:
-    import tensorflow as tf
-    MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stroke_mri_model.h5")
-    if os.path.exists(MODEL_PATH):
-        print(f"Đang nạp AI Model từ: {MODEL_PATH}")
-        model = tf.keras.models.load_model(MODEL_PATH)
-        print("✅ Đã nạp thành công AI MRI!")
-    else:
-        model = None
-        print(f"⚠️ Chưa tìm thấy file model tại {MODEL_PATH}")
-except ImportError:
-    model = None
-    print("⚠️ Cảnh báo: Thư viện 'tensorflow' chưa được cài đặt!")
+# Biến global lưu model để load lười (lazy load)
+mri_model_instance = None
+
+def get_mri_model():
+    global mri_model_instance
+    if mri_model_instance is not None:
+        return mri_model_instance
+        
+    try:
+        import tensorflow as tf
+        
+        class CustomDense(tf.keras.layers.Dense):
+            def __init__(self, **kwargs):
+                kwargs.pop('quantization_config', None)
+                super().__init__(**kwargs)
+                
+        MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stroke_mri_model.h5")
+        if os.path.exists(MODEL_PATH):
+            print(f"Đang nạp AI Model từ: {MODEL_PATH}")
+            mri_model_instance = tf.keras.models.load_model(MODEL_PATH, custom_objects={'Dense': CustomDense}, compile=False)
+            print("✅ Đã nạp thành công AI MRI!")
+        else:
+            print(f"⚠️ Chưa tìm thấy file model tại {MODEL_PATH}")
+    except ImportError:
+        print("⚠️ Cảnh báo: Thư viện 'tensorflow' chưa được cài đặt!")
+        
+    return mri_model_instance
 
 router = APIRouter()
 
@@ -25,6 +38,7 @@ CLASSES = ["Não bình thường", "Nhồi máu não (Tắc mạch)", "Xuất hu
 
 @router.post("/predict-mri")
 async def analyze_mri_image(file: UploadFile = File(...)):
+    model = get_mri_model()
     if model is None:
         raise HTTPException(status_code=500, detail="Mô hình AI chưa được nạp hoặc chưa cài đặt TensorFlow.")
         
