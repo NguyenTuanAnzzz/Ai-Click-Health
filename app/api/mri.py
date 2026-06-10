@@ -14,7 +14,14 @@ def get_mri_model():
         
     try:
         os.environ["TF_USE_LEGACY_KERAS"] = "1"
+        # Ép Tensorflow tiết kiệm RAM tuyệt đối
+        os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+        os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+        os.environ["MALLOC_ARENA_MAX"] = "1"
+        
         import tensorflow as tf
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        tf.config.threading.set_intra_op_parallelism_threads(1)
         
         class CustomDense(tf.keras.layers.Dense):
             def __init__(self, **kwargs):
