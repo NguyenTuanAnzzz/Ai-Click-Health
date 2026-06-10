@@ -13,6 +13,7 @@ def get_mri_model():
         return mri_model_instance
         
     try:
+        os.environ["TF_USE_LEGACY_KERAS"] = "1"
         import tensorflow as tf
         
         class CustomDense(tf.keras.layers.Dense):
