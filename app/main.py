@@ -10,6 +10,7 @@ from app.api.arm import router as arm_router
 from app.api.speech import router as speech_router
 from app.api.realtime import router as realtime_router
 from app.api.stroke import router as stroke_router
+from app.api.mri import router as mri_router
 
 app = FastAPI()
 BASE_DIR = Path(__file__).resolve().parent
@@ -44,3 +45,4 @@ app.include_router(arm_router)
 app.include_router(speech_router)
 app.include_router(realtime_router)
 app.include_router(stroke_router)
+app.include_router(mri_router)
