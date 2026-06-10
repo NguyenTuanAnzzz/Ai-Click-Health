@@ -10,4 +10,4 @@ pillow==12.2.0
 SpeechRecognition==3.16.1
 pydub==0.25.1
 requests==2.33.1
-tensorflow-cpu==2.15.0
+tensorflow-cpu>=2.16.1
