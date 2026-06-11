@@ -4,41 +4,35 @@ import numpy as np
 import io
 import os
 
-# Biến global lưu model để load lười (lazy load)
-mri_model_instance = None
+# Biến global lưu interpreter (TFLite)
+mri_interpreter_instance = None
+input_details = None
+output_details = None
 
 def get_mri_model():
-    global mri_model_instance
-    if mri_model_instance is not None:
-        return mri_model_instance
+    global mri_interpreter_instance, input_details, output_details
+    if mri_interpreter_instance is not None:
+        return mri_interpreter_instance, input_details, output_details
         
     try:
-        os.environ["TF_USE_LEGACY_KERAS"] = "1"
-        # Ép Tensorflow tiết kiệm RAM tuyệt đối
-        os.environ["TF_NUM_INTEROP_THREADS"] = "1"
-        os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
-        os.environ["MALLOC_ARENA_MAX"] = "1"
+        import tflite_runtime.interpreter as tflite
         
-        import tensorflow as tf
-        tf.config.threading.set_inter_op_parallelism_threads(1)
-        tf.config.threading.set_intra_op_parallelism_threads(1)
-        
-        class CustomDense(tf.keras.layers.Dense):
-            def __init__(self, **kwargs):
-                kwargs.pop('quantization_config', None)
-                super().__init__(**kwargs)
-                
-        MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stroke_mri_model.h5")
+        MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stroke_mri_model.tflite")
         if os.path.exists(MODEL_PATH):
             print(f"Đang nạp AI Model từ: {MODEL_PATH}")
-            mri_model_instance = tf.keras.models.load_model(MODEL_PATH, custom_objects={'Dense': CustomDense}, compile=False)
-            print("✅ Đã nạp thành công AI MRI!")
+            mri_interpreter_instance = tflite.Interpreter(model_path=MODEL_PATH)
+            mri_interpreter_instance.allocate_tensors()
+            
+            input_details = mri_interpreter_instance.get_input_details()
+            output_details = mri_interpreter_instance.get_output_details()
+            
+            print("✅ Đã nạp thành công AI MRI (TFLite)!")
         else:
             print(f"⚠️ Chưa tìm thấy file model tại {MODEL_PATH}")
     except ImportError:
-        print("⚠️ Cảnh báo: Thư viện 'tensorflow' chưa được cài đặt!")
+        print("⚠️ Cảnh báo: Thư viện 'tflite-runtime' chưa được cài đặt!")
         
-    return mri_model_instance
+    return mri_interpreter_instance, input_details, output_details
 
 router = APIRouter()
 
@@ -46,9 +40,9 @@ CLASSES = ["Não bình thường", "Nhồi máu não (Tắc mạch)", "Xuất hu
 
 @router.post("/predict-mri")
 async def analyze_mri_image(file: UploadFile = File(...)):
-    model = get_mri_model()
-    if model is None:
-        raise HTTPException(status_code=500, detail="Mô hình AI chưa được nạp hoặc chưa cài đặt TensorFlow.")
+    interpreter, input_dets, output_dets = get_mri_model()
+    if interpreter is None:
+        raise HTTPException(status_code=500, detail="Mô hình AI chưa được nạp hoặc chưa cài đặt tflite-runtime.")
         
     try:
         # 1. Đọc ảnh gửi lên
@@ -57,11 +51,13 @@ async def analyze_mri_image(file: UploadFile = File(...)):
         
         # 2. Tiền xử lý ảnh (Resize về 224x224 và chuẩn hóa 0-1)
         image = image.resize((224, 224))
-        img_array = np.array(image) / 255.0
+        img_array = np.array(image, dtype=np.float32) / 255.0
         img_array = np.expand_dims(img_array, axis=0) # [1, 224, 224, 3]
         
-        # 3. Chạy model dự báo
-        predictions = model.predict(img_array)[0]
+        # 3. Chạy model dự báo (TFLite)
+        interpreter.set_tensor(input_dets[0]['index'], img_array)
+        interpreter.invoke()
+        predictions = interpreter.get_tensor(output_dets[0]['index'])[0]
         
         # 4. Trích xuất kết quả
         max_index = np.argmax(predictions)
