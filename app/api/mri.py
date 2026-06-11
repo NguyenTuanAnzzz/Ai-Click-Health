@@ -15,7 +15,7 @@ def get_mri_model():
         return mri_interpreter_instance, input_details, output_details
         
     try:
-        import tflite_runtime.interpreter as tflite
+        import ai_edge_litert.interpreter as tflite
         
         MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stroke_mri_model.tflite")
         if os.path.exists(MODEL_PATH):
@@ -30,7 +30,7 @@ def get_mri_model():
         else:
             print(f"⚠️ Chưa tìm thấy file model tại {MODEL_PATH}")
     except ImportError:
-        print("⚠️ Cảnh báo: Thư viện 'tflite-runtime' chưa được cài đặt!")
+        print("⚠️ Cảnh báo: Thư viện 'ai-edge-litert' chưa được cài đặt!")
         
     return mri_interpreter_instance, input_details, output_details
 
@@ -52,6 +52,7 @@ async def analyze_mri_image(file: UploadFile = File(...)):
         # 2. Tiền xử lý ảnh (Resize về 224x224 và chuẩn hóa 0-1)
         image = image.resize((224, 224))
         img_array = np.array(image, dtype=np.float32) / 255.0
+        img_array = img_array.astype(np.float32) # Đảm bảo tuyệt đối là float32 cho TFLite
         img_array = np.expand_dims(img_array, axis=0) # [1, 224, 224, 3]
         
         # 3. Chạy model dự báo (TFLite)
