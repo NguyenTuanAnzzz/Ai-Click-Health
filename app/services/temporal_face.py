@@ -61,10 +61,10 @@ def analyze_face_timeline(frames: list[dict], min_frames: int = 30) -> dict:
         1
         for frame in frames
         if frame.get("isAbnormal")
-        or (frame.get("asymmetryScorePct", frame.get("deviationPct", 0)) > 3.2)
-        or (frame.get("mouthCornerDevPct", frame.get("mouthDevPct", 0)) > 2.6)
-        or (frame.get("mouthCenterOffsetPct", 0) > 3.4)
-        or (frame.get("mouthSideBalancePct", 0) > 3.2)
+        or (frame.get("asymmetryScorePct", frame.get("deviationPct", 0)) > 4.8)
+        or (frame.get("mouthCornerDevPct", frame.get("mouthDevPct", 0)) > 3.6)
+        or (frame.get("mouthCenterOffsetPct", 0) > 5.0)
+        or (frame.get("mouthSideBalancePct", 0) > 5.0)
     )
     abnormal_pct = abnormal_frames / len(frames) * 100
 
@@ -76,13 +76,13 @@ def analyze_face_timeline(frames: list[dict], min_frames: int = 30) -> dict:
         p90_center * 0.95,
         p90_side * 0.9,
     )
-    sustained_mouth_droop = median_mouth > 1.8 and p90_mouth > 2.5
-    center_shift = median_center > 2.2 and p90_center > 3.0
-    side_asymmetry = median_side > 2.1 and p90_side > 3.0
-    peak_asymmetry = p95_dev > 3.4 or max_dev > 4.5
+    sustained_mouth_droop = median_mouth > 2.4 and p90_mouth > 3.4
+    center_shift = median_center > 3.0 and p90_center > 4.2
+    side_asymmetry = median_side > 3.0 and p90_side > 4.2
+    peak_asymmetry = p95_dev > 5.2 and abnormal_pct > 20
 
-    symmetry_score = clamp(100 - composite_deviation * 12 - abnormal_pct * 0.25, 0, 100)
-    stability_score = clamp(100 - clamp(p95_dev - median_dev, 0, 10) * 8 - abnormal_pct * 0.1, 0, 100)
+    symmetry_score = clamp(100 - composite_deviation * 8 - abnormal_pct * 0.18, 0, 100)
+    stability_score = clamp(100 - clamp(p95_dev - median_dev, 0, 10) * 5 - abnormal_pct * 0.08, 0, 100)
     movement_variance = clamp(abnormal_pct, 0, 100)
     composite = clamp(symmetry_score * 0.6 + stability_score * 0.4, 0, 100)
 
@@ -91,7 +91,7 @@ def analyze_face_timeline(frames: list[dict], min_frames: int = 30) -> dict:
         or center_shift
         or side_asymmetry
         or peak_asymmetry
-        or abnormal_pct > 30
+        or abnormal_pct > 45
     )
     raw_risk_level = risk_from_score(composite)
     risk_level = "medium" if is_abnormal and raw_risk_level == "low" else raw_risk_level
@@ -105,7 +105,7 @@ def analyze_face_timeline(frames: list[dict], min_frames: int = 30) -> dict:
         parts.append(f"Vùng miệng/má mất cân đối {p90_side:.1f}%")
     if peak_asymmetry:
         parts.append(f"Bất đối xứng khuôn mặt {p95_dev:.1f}%")
-    if abnormal_pct > 30:
+    if abnormal_pct > 45:
         parts.append(f"Bất đối xứng kéo dài {round(abnormal_pct)}% thời lượng")
     if not parts:
         parts.append("Khuôn mặt cân đối theo thời gian")
