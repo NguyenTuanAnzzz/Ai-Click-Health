@@ -23,6 +23,14 @@ class BalanceFrame(BaseModel):
 class FaceFrame(BaseModel):
     t: float = 0
     deviationPct: float
+    eyeDevPct: float = 0
+    mouthDevPct: float = 0
+    mouthCornerDevPct: float = 0
+    mouthCenterOffsetPct: float = 0
+    mouthSideBalancePct: float = 0
+    cheekAsymmetryPct: float = 0
+    mouthVerticalCenterPct: float = 0
+    asymmetryScorePct: float = 0
     isAbnormal: bool = False
 
 

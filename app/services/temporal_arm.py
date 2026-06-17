@@ -41,8 +41,9 @@ def analyze_arm_timeline(frames: list[dict], min_frames: int = 45) -> dict:
     composite = clamp(composite * 0.7 + left_right_balance * 0.3, 0, 100)
     abnormal_motion_pct = clamp((arm_drift_pct + movement_variance) / 2, 0, 100)
 
-    risk_level = risk_from_score(composite)
+    raw_risk_level = risk_from_score(composite)
     arm_weakness = composite < 65 or stability_left < 65 or stability_right < 65 or raise_pct < 60
+    risk_level = "medium" if arm_weakness and raw_risk_level == "low" else raw_risk_level
 
     parts = []
     if raise_pct < 60:
